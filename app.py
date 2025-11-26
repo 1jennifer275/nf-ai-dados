@@ -314,51 +314,76 @@ def salvar_dados_banco(dados_extraidos):
 def processar_nota_fiscal_gemini(texto_pdf):
     """Processa a nota fiscal usando Gemini AI - versão simplificada e estável"""
     
-    # Prompt original (funcionava bem)
     prompt = f"""
-    Analise a seguinte nota fiscal e extraia as informações em formato JSON:
+    Analise este DANFE (Documento Auxiliar da Nota Fiscal Eletrônica) e extraia TODAS as informações em formato JSON estruturado.
 
+    TEXTO DA NOTA FISCAL:
     {texto_pdf}
 
-    Categorias de despesas disponíveis:
-    - INSUMOS AGRÍCOLAS: sementes, fertilizantes, defensivos agrícolas, corretivos, soja, milho, npk
-    - MANUTENÇÃO E OPERAÇÃO: combustíveis, lubrificantes, óleo diesel, gasolina, peças, manutenção, pneus, filtros, ferramentas, diesel, óleo, trator
-    - RECURSOS HUMANOS: mão de obra temporária, salários, encargos
-    - SERVIÇOS OPERACIONAIS: frete, transporte, colheita terceirizada, secagem, armazenagem, pulverização, aplicação, mercadorias
-    - INFRAESTRUTURA E UTILIDADES: energia elétrica, arrendamento de terras, construções, reformas, materiais de construção, material hidráulico, cimento, ferro
+    INSTRUÇÕES DE EXTRAÇÃO:
+    
+    1. NOTA FISCAL: Extrair número, série e data de emissão
+    2. EMITENTE (fornecedor/vendedor): Razão Social, CNPJ, Inscrição Estadual, Endereço completo
+    3. DESTINATÁRIO (remetente/comprador): Nome/Razão Social, CPF ou CNPJ, Endereço completo
+    4. PRODUTOS/ITENS: Descrição, quantidade, valor unitário, valor total de cada item
+    5. VALORES: Valor total da nota, valor dos produtos, impostos
+    
+    CATEGORIAS PARA CLASSIFICAÇÃO AUTOMÁTICA:
+    - INSUMOS AGRÍCOLAS: sementes, fertilizantes, defensivos, corretivos, soja, milho, npk
+    - MANUTENÇÃO E OPERAÇÃO: combustíveis, lubrificantes, diesel, gasolina, peças, pneus, filtros, ferramentas, óleo
+    - RECURSOS HUMANOS: mão de obra, salários, encargos
+    - SERVIÇOS OPERACIONAIS: frete, transporte, colheita, secagem, armazenagem, pulverização, mercadorias
+    - INFRAESTRUTURA E UTILIDADES: energia elétrica, arrendamento, construções, reformas, materiais de construção, hidráulico, cimento, ferro
     - ADMINISTRATIVAS: honorários, contábeis, advocatícios, agronômicos, despesas bancárias, financeiras
-    - SEGUROS E PROTEÇÃO: seguro agrícola, seguro de ativos, seguro prestamista, máquinas, veículos
+    - SEGUROS E PROTEÇÃO: seguro agrícola, seguro de ativos, prestamista, máquinas, veículos
     - IMPOSTOS E TAXAS: ITR, IPTU, IPVA, INCRA-CCIR
-    - INVESTIMENTOS: aquisição de máquinas, implementos, aquisição de veículos, aquisição de imóveis, infraestrutura rural
-    - Outros: para itens que não se encaixam nas categorias acima
+    - INVESTIMENTOS: aquisição de máquinas, implementos, veículos, imóveis, infraestrutura
+    - VAREJO: compras em lojas, magazine, mercadorias gerais
+    - Outros: itens que não se encaixam acima
 
-    Exemplo de resposta esperada:
+    FORMATO JSON ESPERADO:
     {{
         "nota_fiscal": {{
-            "numero": "123456",
-            "serie": "1",
-            "data_emissao": "2024-01-15"
+            "numero": "693983",
+            "serie": "25",
+            "data_emissao": "21/05/2019",
+            "valor_total": 0.00
         }},
         "emitente": {{
-            "razao_social": "Empresa ABC Ltda",
-            "cnpj": "12.345.678/0001-90",
-            "endereco": "Rua das Flores, 123, São Paulo, SP"
+            "razao_social": "MAGAZINE LUIZA S/A",
+            "cnpj": "47.960.950/0897-85",
+            "inscricao_estadual": "221021117115",
+            "endereco": "ROD BANDEIRANTES S/M, 0 KM 68 - LOUVEIRA - SP",
+            "cep": "13290000",
+            "telefone": ""
         }},
         "remetente": {{
-            "nome_completo": "João Silva",
-            "cpf_ou_cnpj": "123.456.789-00",
-            "endereco": "Fazenda Santa Maria, Zona Rural, Cidade, Estado"
+            "nome_completo": "OLLIYER OTTORONI",
+            "cpf_ou_cnpj": "126.295.868-71",
+            "endereco": "ANTONIO BORGES DA FONSECA 39 - JD FLORESTA - SÃO PAULO - SP",
+            "cep": "04836-120",
+            "telefone": "11976643126"
         }},
         "itens": {{
-            "descricao_produtos": "Fertilizante NPK 20-05-20",
-            "quantidade": 10,
-            "parcelas": 1,
-            "valor_total": 1500.00
+            "produtos": [
+                {{
+                    "descricao": "Descrição do produto",
+                    "quantidade": 1,
+                    "valor_unitario": 0.00,
+                    "valor_total": 0.00
+                }}
+            ]
         }},
-        "classificacoes": ["INSUMOS AGRÍCOLAS"]
+        "classificacoes": ["VAREJO"]
     }}
 
-    Retorne APENAS o JSON, sem texto adicional.
+    IMPORTANTE:
+    - Extraia TODAS as informações disponíveis
+    - Use o formato de data exatamente como está no documento
+    - Mantenha CPF/CNPJ com pontuação
+    - Se não encontrar valor total, some os itens
+    - Classifique automaticamente baseado nos produtos
+    - Retorne APENAS o JSON válido, sem texto adicional
     """
     
     try:
@@ -1287,6 +1312,439 @@ def admin_api_classificacoes():
         return jsonify(dados)
     except Exception as e:
         return jsonify({"erro": f"Erro ao buscar classificações: {str(e)}"}), 500
+
+# ============================================
+# ENDPOINTS CRUD COMPLETO - PESSOAS
+# ============================================
+
+@app.route('/api/pessoas', methods=['GET'])
+def api_get_pessoas():
+    """Busca pessoas com filtros opcionais"""
+    try:
+        tipo = request.args.get('tipo')  # FORNECEDOR, CLIENTE, FATURADO
+        status = request.args.get('status', 'ATIVO')
+        busca = request.args.get('busca', '')
+        todos = request.args.get('todos', 'false').lower() == 'true'
+        
+        query = Pessoas.query
+        
+        # Filtrar por status (se não for 'todos')
+        if not todos:
+            query = query.filter_by(status=status)
+        
+        # Filtrar por tipo se fornecido
+        if tipo:
+            query = query.filter_by(tipo=tipo)
+        
+        # Busca por múltiplos campos
+        if busca:
+            query = query.filter(
+                db.or_(
+                    Pessoas.razaosocial.ilike(f'%{busca}%'),
+                    Pessoas.fantasia.ilike(f'%{busca}%'),
+                    Pessoas.documento.ilike(f'%{busca}%')
+                )
+            )
+        
+        pessoas = query.all()
+        return jsonify([p.to_dict() for p in pessoas])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/pessoas/<int:id>', methods=['GET'])
+def api_get_pessoa(id):
+    """Busca uma pessoa específica por ID"""
+    try:
+        pessoa = Pessoas.query.get(id)
+        if not pessoa:
+            return jsonify({"error": "Pessoa não encontrada"}), 404
+        return jsonify(pessoa.to_dict())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/pessoas', methods=['POST'])
+def api_create_pessoa():
+    """Cria uma nova pessoa"""
+    try:
+        dados = request.get_json()
+        
+        # Validações
+        if not dados.get('tipo') or not dados.get('razaosocial') or not dados.get('documento'):
+            return jsonify({"error": "Campos obrigatórios: tipo, razaosocial, documento"}), 400
+        
+        # Criar nova pessoa com STATUS = ATIVO (oculto)
+        nova_pessoa = Pessoas(
+            tipo=dados['tipo'],
+            razaosocial=dados['razaosocial'],
+            fantasia=dados.get('fantasia', ''),
+            documento=dados['documento'],
+            status='ATIVO'  # STATUS oculto sempre ATIVO no CREATE
+        )
+        
+        db.session.add(nova_pessoa)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Pessoa criada com sucesso",
+            "data": nova_pessoa.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/pessoas/<int:id>', methods=['PUT'])
+def api_update_pessoa(id):
+    """Atualiza uma pessoa existente"""
+    try:
+        pessoa = Pessoas.query.get(id)
+        if not pessoa:
+            return jsonify({"error": "Pessoa não encontrada"}), 404
+        
+        dados = request.get_json()
+        
+        # Atualizar campos (STATUS permanece oculto no UPDATE)
+        if 'tipo' in dados:
+            pessoa.tipo = dados['tipo']
+        if 'razaosocial' in dados:
+            pessoa.razaosocial = dados['razaosocial']
+        if 'fantasia' in dados:
+            pessoa.fantasia = dados['fantasia']
+        if 'documento' in dados:
+            pessoa.documento = dados['documento']
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Pessoa atualizada com sucesso",
+            "data": pessoa.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/pessoas/<int:id>', methods=['DELETE'])
+def api_delete_pessoa(id):
+    """Exclui logicamente uma pessoa (altera STATUS para INATIVO)"""
+    try:
+        pessoa = Pessoas.query.get(id)
+        if not pessoa:
+            return jsonify({"error": "Pessoa não encontrada"}), 404
+        
+        # DELETE lógico: altera STATUS para INATIVO
+        pessoa.status = 'INATIVO'
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Pessoa excluída com sucesso"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# ENDPOINTS CRUD COMPLETO - CLASSIFICAÇÕES
+# ============================================
+
+@app.route('/api/classificacoes', methods=['GET'])
+def api_get_classificacoes():
+    """Busca classificações com filtros opcionais"""
+    try:
+        tipo = request.args.get('tipo')  # RECEITA ou DESPESA
+        status = request.args.get('status', 'ATIVO')
+        busca = request.args.get('busca', '')
+        todos = request.args.get('todos', 'false').lower() == 'true'
+        
+        query = Classificacao.query
+        
+        # Filtrar por status (se não for 'todos')
+        if not todos:
+            query = query.filter_by(status=status)
+        
+        # Filtrar por tipo se fornecido
+        if tipo:
+            query = query.filter_by(tipo=tipo)
+        
+        # Busca por descrição
+        if busca:
+            query = query.filter(Classificacao.descricao.ilike(f'%{busca}%'))
+        
+        classificacoes = query.all()
+        return jsonify([c.to_dict() for c in classificacoes])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/classificacoes/<int:id>', methods=['GET'])
+def api_get_classificacao(id):
+    """Busca uma classificação específica por ID"""
+    try:
+        classificacao = Classificacao.query.get(id)
+        if not classificacao:
+            return jsonify({"error": "Classificação não encontrada"}), 404
+        return jsonify(classificacao.to_dict())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/classificacoes', methods=['POST'])
+def api_create_classificacao():
+    """Cria uma nova classificação"""
+    try:
+        dados = request.get_json()
+        
+        # Validações
+        if not dados.get('tipo') or not dados.get('descricao'):
+            return jsonify({"error": "Campos obrigatórios: tipo, descricao"}), 400
+        
+        # Criar nova classificação com STATUS = ATIVO (oculto)
+        nova_classificacao = Classificacao(
+            tipo=dados['tipo'],
+            descricao=dados['descricao'],
+            status='ATIVO'  # STATUS oculto sempre ATIVO no CREATE
+        )
+        
+        db.session.add(nova_classificacao)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Classificação criada com sucesso",
+            "data": nova_classificacao.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/classificacoes/<int:id>', methods=['PUT'])
+def api_update_classificacao(id):
+    """Atualiza uma classificação existente"""
+    try:
+        classificacao = Classificacao.query.get(id)
+        if not classificacao:
+            return jsonify({"error": "Classificação não encontrada"}), 404
+        
+        dados = request.get_json()
+        
+        # Atualizar campos (STATUS permanece oculto no UPDATE)
+        if 'tipo' in dados:
+            classificacao.tipo = dados['tipo']
+        if 'descricao' in dados:
+            classificacao.descricao = dados['descricao']
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Classificação atualizada com sucesso",
+            "data": classificacao.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/classificacoes/<int:id>', methods=['DELETE'])
+def api_delete_classificacao(id):
+    """Exclui logicamente uma classificação (altera STATUS para INATIVO)"""
+    try:
+        classificacao = Classificacao.query.get(id)
+        if not classificacao:
+            return jsonify({"error": "Classificação não encontrada"}), 404
+        
+        # DELETE lógico: altera STATUS para INATIVO
+        classificacao.status = 'INATIVO'
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Classificação excluída com sucesso"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# ENDPOINTS CRUD COMPLETO - MOVIMENTOS (CONTAS)
+# ============================================
+
+@app.route('/api/movimentos', methods=['GET'])
+def api_get_movimentos():
+    """Busca movimentos com filtros opcionais"""
+    try:
+        tipo = request.args.get('tipo')  # RECEITA ou DESPESA
+        status = request.args.get('status', 'ATIVO')
+        busca = request.args.get('busca', '')
+        todos = request.args.get('todos', 'false').lower() == 'true'
+        
+        query = MovimentoContas.query
+        
+        # Filtrar por status (se não for 'todos')
+        if not todos:
+            query = query.filter_by(status=status)
+        
+        # Filtrar por tipo se fornecido
+        if tipo:
+            query = query.filter_by(tipo=tipo)
+        
+        # Busca por múltiplos campos
+        if busca:
+            query = query.filter(
+                db.or_(
+                    MovimentoContas.descricao.ilike(f'%{busca}%'),
+                    MovimentoContas.numeronotafiscal.ilike(f'%{busca}%')
+                )
+            )
+        
+        movimentos = query.all()
+        return jsonify([m.to_dict() for m in movimentos])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/movimentos/<int:id>', methods=['GET'])
+def api_get_movimento(id):
+    """Busca um movimento específico por ID"""
+    try:
+        movimento = MovimentoContas.query.get(id)
+        if not movimento:
+            return jsonify({"error": "Movimento não encontrado"}), 404
+        return jsonify(movimento.to_dict())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/movimentos', methods=['POST'])
+def api_create_movimento():
+    """Cria um novo movimento"""
+    try:
+        dados = request.get_json()
+        
+        # Validações
+        campos_obrigatorios = ['tipo', 'dataemissao', 'valortotal', 'Pessoas_idFornecedorCliente', 'Pessoas_idFaturado']
+        for campo in campos_obrigatorios:
+            if campo not in dados:
+                return jsonify({"error": f"Campo obrigatório: {campo}"}), 400
+        
+        # Converter data
+        data_emissao = datetime.strptime(dados['dataemissao'], '%Y-%m-%d').date()
+        
+        # Criar novo movimento com STATUS = ATIVO (oculto)
+        novo_movimento = MovimentoContas(
+            tipo=dados['tipo'],
+            numeronotafiscal=dados.get('numeronotafiscal', ''),
+            dataemissao=data_emissao,
+            descricao=dados.get('descricao', ''),
+            valortotal=dados['valortotal'],
+            Pessoas_idFornecedorCliente=dados['Pessoas_idFornecedorCliente'],
+            Pessoas_idFaturado=dados['Pessoas_idFaturado'],
+            status='ATIVO'  # STATUS oculto sempre ATIVO no CREATE
+        )
+        
+        db.session.add(novo_movimento)
+        
+        # Adicionar classificações se fornecidas
+        if 'classificacoes' in dados:
+            for classif_id in dados['classificacoes']:
+                classificacao = Classificacao.query.get(classif_id)
+                if classificacao:
+                    novo_movimento.classificacoes.append(classificacao)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Movimento criado com sucesso",
+            "data": novo_movimento.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/movimentos/<int:id>', methods=['PUT'])
+def api_update_movimento(id):
+    """Atualiza um movimento existente"""
+    try:
+        movimento = MovimentoContas.query.get(id)
+        if not movimento:
+            return jsonify({"error": "Movimento não encontrado"}), 404
+        
+        dados = request.get_json()
+        
+        # Atualizar campos (STATUS permanece oculto no UPDATE)
+        if 'tipo' in dados:
+            movimento.tipo = dados['tipo']
+        if 'numeronotafiscal' in dados:
+            movimento.numeronotafiscal = dados['numeronotafiscal']
+        if 'dataemissao' in dados:
+            movimento.dataemissao = datetime.strptime(dados['dataemissao'], '%Y-%m-%d').date()
+        if 'descricao' in dados:
+            movimento.descricao = dados['descricao']
+        if 'valortotal' in dados:
+            movimento.valortotal = dados['valortotal']
+        if 'Pessoas_idFornecedorCliente' in dados:
+            movimento.Pessoas_idFornecedorCliente = dados['Pessoas_idFornecedorCliente']
+        if 'Pessoas_idFaturado' in dados:
+            movimento.Pessoas_idFaturado = dados['Pessoas_idFaturado']
+        
+        # Atualizar classificações
+        if 'classificacoes' in dados:
+            movimento.classificacoes = []
+            for classif_id in dados['classificacoes']:
+                classificacao = Classificacao.query.get(classif_id)
+                if classificacao:
+                    movimento.classificacoes.append(classificacao)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Movimento atualizado com sucesso",
+            "data": movimento.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/movimentos/<int:id>', methods=['DELETE'])
+def api_delete_movimento(id):
+    """Exclui logicamente um movimento (altera STATUS para INATIVO)"""
+    try:
+        movimento = MovimentoContas.query.get(id)
+        if not movimento:
+            return jsonify({"error": "Movimento não encontrado"}), 404
+        
+        # DELETE lógico: altera STATUS para INATIVO
+        movimento.status = 'INATIVO'
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Movimento excluído com sucesso"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# ROTAS DAS PÁGINAS DE CRUD
+# ============================================
+
+@app.route('/crud/pessoas')
+def crud_pessoas():
+    """Página de CRUD de Pessoas"""
+    return render_template('crud_pessoas.html')
+
+@app.route('/crud/classificacoes')
+def crud_classificacoes():
+    """Página de CRUD de Classificações"""
+    return render_template('crud_classificacoes.html')
+
+@app.route('/crud/movimentos')
+def crud_movimentos():
+    """Página de CRUD de Movimentos"""
+    return render_template('crud_movimentos.html')
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

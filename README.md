@@ -17,10 +17,13 @@ Sistema completo para processamento inteligente de notas fiscais utilizando Inte
 - ✅ Geração de respostas elaboradas com LLM
 - ✅ Interface web intuitiva
 
-### 3. **Gestão de Dados**
-- ✅ CRUD completo de pessoas (fornecedores/clientes)
-- ✅ Gerenciamento de movimentos de contas
-- ✅ Controle de classificações e categorias
+### 3. **Gestão de Dados (CRUD Completo)**
+- ✅ **Manter Pessoas**: Gerenciamento de Fornecedores, Clientes e Faturados
+- ✅ **Manter Classificações**: Gestão de Receitas e Despesas
+- ✅ **Manter Movimentos**: Controle de Notas Fiscais e Movimentações
+- ✅ Interface moderna com busca avançada
+- ✅ Exclusão lógica (STATUS ATIVO/INATIVO)
+- ✅ Ordenação por colunas
 - ✅ Painel administrativo
 
 ### 4. **Agente IA Secundário**
@@ -139,6 +142,9 @@ docker-compose logs -f
 - **Backend**: http://localhost:5000
 - **Sistema RAG**: http://localhost:5000/rag
 - **Painel Admin**: http://localhost:5000/admin
+- **Manter Pessoas**: http://localhost:5000/crud/pessoas
+- **Manter Classificações**: http://localhost:5000/crud/classificacoes
+- **Manter Movimentos**: http://localhost:5000/crud/movimentos
 
 ---
 
@@ -210,6 +216,9 @@ python app.py
 - **Sistema**: http://localhost:5000
 - **Sistema RAG**: http://localhost:5000/rag
 - **Painel Admin**: http://localhost:5000/admin
+- **Manter Pessoas**: http://localhost:5000/crud/pessoas
+- **Manter Classificações**: http://localhost:5000/crud/classificacoes
+- **Manter Movimentos**: http://localhost:5000/crud/movimentos
 
 ---
 
@@ -242,14 +251,61 @@ python app.py
 4. Clique em "Buscar Resposta"
 5. Veja a resposta elaborada pela IA e o contexto recuperado
 
-### 3. Painel Administrativo
+### 3. Sistema de CRUD Completo
+
+#### Manter Pessoas
+1. Acesse http://localhost:5000/crud/pessoas
+2. Escolha a aba: **Fornecedor**, **Cliente** ou **Faturado**
+3. Use a busca para localizar registros por razão social, fantasia ou documento
+4. Clique em **"Todos"** para carregar apenas registros ATIVOS
+5. Ações disponíveis: **Editar** e **Excluir** (exclusão lógica)
+
+#### Manter Classificações
+1. Acesse http://localhost:5000/crud/classificacoes
+2. Escolha a aba: **Receita** ou **Despesa**
+3. Busque por descrição
+4. Gerencie categorias de receitas e despesas
+
+#### Manter Movimentos (Contas)
+1. Acesse http://localhost:5000/crud/movimentos
+2. Busque por descrição ou número de nota fiscal
+3. Crie novos movimentos vinculando pessoas e classificações
+4. Edite valores, datas e relacionamentos
+
+### 4. Painel Administrativo
 
 1. Acesse http://localhost:5000/admin
-2. Clique nas abas para visualizar:
+2. Visualize relatórios consolidados de:
    - **Pessoas**: Fornecedores e clientes cadastrados
    - **Movimentações**: Notas fiscais e movimentos
    - **Classificações**: Categorias de despesas e receitas
-3. Use os botões de ação para editar ou inativar registros
+
+---
+
+## 🧪 Dados de Teste
+
+O projeto inclui um script SQL com **200+ registros** para testar a navegabilidade e o sistema RAG:
+
+### Como Popular o Banco
+```bash
+# Opção 1: Via psql
+psql -U postgres -d nf_ai_dados < seed_data.sql
+
+# Opção 2: Docker
+docker-compose exec db psql -U postgres -d nf_ai < /seed_data.sql
+```
+
+### Dados Incluídos
+- **80 Pessoas**: 40 Fornecedores + 20 Clientes + 20 Faturados
+- **120 Movimentos**: 90 Despesas + 30 Receitas (distribuídas em 2024)
+- **Relacionamentos**: Todos os movimentos vinculados a pessoas e classificações
+
+### Características dos Dados
+- ✅ Distribuição realista ao longo de 2024
+- ✅ Valores variados (R$ 1.200 a R$ 152.000)
+- ✅ Classificações apropriadas por tipo de despesa
+- ✅ Relacionamentos corretos entre entidades
+- ✅ Ideal para testar buscas, filtros e RAG
 
 ---
 
@@ -467,8 +523,8 @@ kill -9 <PID>
 
 ## 📚 Documentação Adicional
 
-- [Documentação RAG Completa](RAG_DOCUMENTATION.md) *(se existir)*
-- [Guia de Execução Detalhado](GUIA_EXECUCAO.md) *(se existir)*
+- [Guia de Hospedagem Completo](GUIA_HOSPEDAGEM.md) - Deploy em PythonAnywhere, Vercel e Render
+- [Script de Dados de Teste](seed_data.sql) - 200+ registros para testar o sistema
 
 ---
 
@@ -503,14 +559,18 @@ Sistema desenvolvido para processamento inteligente de notas fiscais e gestão f
 - [x] Extração de dados de notas fiscais
 - [x] Sistema RAG com 3 métodos
 - [x] Painel administrativo
-- [x] CRUD completo
+- [x] CRUD completo (Pessoas, Classificações, Movimentos)
+- [x] Interfaces modernas para gestão de dados
+- [x] Exclusão lógica com controle de STATUS
+- [x] Busca avançada com múltiplos filtros
 - [x] Agente IA secundário
+- [x] Script de dados de teste (200+ registros)
+- [x] Documentação de hospedagem
 - [ ] Autenticação e autorização
 - [ ] Dashboard de analytics
 - [ ] Exportação de relatórios
 - [ ] API REST documentada (Swagger)
 - [ ] Testes automatizados
-- [ ] Deploy em produção
 
 ---
 
@@ -554,4 +614,8 @@ Para problemas ou dúvidas:
 1. Verifique os logs: `docker-compose logs -f` ou `tail -f app.log`
 2. Consulte a seção de Troubleshooting
 3. Abra uma issue no repositório
+
+---
+
+**Desenvolvido com ❤️ usando Python, Flask e Gemini AI**
 

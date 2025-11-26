@@ -3,39 +3,276 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Sistema de Gestão</title>
-    <link rel="stylesheet" href="/static/css/admin.css">
+    <title>Painel Administrativo - NF-AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Painel Administrativo</h1>
-        
-        <nav>
-            <a href="/">
-                <button>
-                    ← Início
-                </button>
-            </a>
-            <a href="/rag">
-                <button>
-                    Busca Inteligente (RAG)
-                </button>
-            </a>
-            <button onclick="carregarTabela('pessoas')">Pessoas</button>
-            <button onclick="carregarTabela('movimentos')">Movimentações</button>
-            <button onclick="carregarTabela('classificacoes')">Classificações</button>
-        </nav>
-
-        <div class="content">
-            <div id="loading" style="display: none;">Carregando...</div>
-            <div id="error" style="display: none;"></div>
-            
-            <div id="table-container">
-                <p>Selecione uma opção no menu acima para visualizar os dados.</p>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-6 py-5">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-11 h-11 bg-black rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">Painel Administrativo</h1>
+                        <p class="text-sm text-gray-600">Visualização consolidada de dados</p>
+                    </div>
+                </div>
+                <nav class="flex items-center space-x-2">
+                    <a href="/" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-100 rounded-lg transition-colors">Início</a>
+                    <a href="/rag" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-100 rounded-lg transition-colors">RAG</a>
+                    <a href="/crud/pessoas" class="px-5 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all shadow-sm font-medium text-sm">
+                        CRUD
+                    </a>
+                </nav>
             </div>
         </div>
-    </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Total de Pessoas</p>
+                        <p id="total-pessoas" class="text-3xl font-bold text-gray-900 mt-2">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Movimentações</p>
+                        <p id="total-movimentos" class="text-3xl font-bold text-gray-900 mt-2">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Classificações</p>
+                        <p id="total-classificacoes" class="text-3xl font-bold text-gray-900 mt-2">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            <div class="border-b border-gray-200 px-6 bg-gray-50">
+                <nav class="flex space-x-8">
+                    <button onclick="showTab('pessoas')" class="tab-button py-4 px-2 border-b-2 border-transparent font-semibold text-sm transition-colors hover:text-black" data-tab="pessoas">
+                        Pessoas
+                    </button>
+                    <button onclick="showTab('movimentos')" class="tab-button py-4 px-2 border-b-2 border-transparent font-semibold text-sm transition-colors hover:text-black" data-tab="movimentos">
+                        Movimentações
+                    </button>
+                    <button onclick="showTab('classificacoes')" class="tab-button py-4 px-2 border-b-2 border-transparent font-semibold text-sm transition-colors hover:text-black" data-tab="classificacoes">
+                        Classificações
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Content Area -->
+            <div class="p-8">
+                <!-- Empty State -->
+                <div id="empty-state" class="text-center py-16">
+                    <div class="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Selecione uma opção para visualizar os dados</h3>
+                    <p class="text-gray-600">Escolha uma das abas acima para começar</p>
+                </div>
+
+                <!-- Pessoas Table -->
+                <div id="pessoas-table" class="hidden">
+                    <div class="overflow-x-auto rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tipo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Razão Social</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Documento</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pessoas-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Movimentos Table -->
+                <div id="movimentos-table" class="hidden">
+                    <div class="overflow-x-auto rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Fornecedor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Classificação</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Descrição</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="movimentos-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Classificações Table -->
+                <div id="classificacoes-table" class="hidden">
+                    <div class="overflow-x-auto rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tipo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Descrição</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classificacoes-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
     <script src="/static/js/admin.js"></script>
+    <script>
+        function showTab(tabName) {
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('pessoas-table').classList.add('hidden');
+            document.getElementById('movimentos-table').classList.add('hidden');
+            document.getElementById('classificacoes-table').classList.add('hidden');
+
+            document.getElementById(tabName + '-table').classList.remove('hidden');
+
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('text-black', 'border-black');
+                btn.classList.add('text-gray-600');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('text-black', 'border-black');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('text-gray-600');
+
+            if (tabName === 'pessoas') loadPessoas();
+            if (tabName === 'movimentos') loadMovimentos();
+            if (tabName === 'classificacoes') loadClassificacoes();
+        }
+
+        async function loadPessoas() {
+            try {
+                const response = await fetch('/admin/api/pessoas');
+                const data = await response.json();
+                const tbody = document.getElementById('pessoas-tbody');
+                tbody.innerHTML = data.map(p => `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${p.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-900">${p.tipo}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-medium">${p.razaosocial}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 font-mono">${p.documento}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-lg ${
+                                p.status === 'ATIVO' ? 'bg-black text-white' : 'bg-gray-200 text-gray-700'
+                            }">${p.status}</span>
+                        </td>
+                    </tr>
+                `).join('');
+                document.getElementById('total-pessoas').textContent = data.length;
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+
+        async function loadMovimentos() {
+            try {
+                const response = await fetch('/admin/api/movimentos');
+                const data = await response.json();
+                const tbody = document.getElementById('movimentos-tbody');
+                tbody.innerHTML = data.map(m => `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${m.id}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-medium">${m.pessoa_nome}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.classificacao_nome}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${m.descricao}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                            ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(m.valor)}
+                        </td>
+                    </tr>
+                `).join('');
+                document.getElementById('total-movimentos').textContent = data.length;
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+
+        async function loadClassificacoes() {
+            try {
+                const response = await fetch('/admin/api/classificacoes');
+                const data = await response.json();
+                const tbody = document.getElementById('classificacoes-tbody');
+                tbody.innerHTML = data.map(c => `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${c.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-900">${c.nome}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-medium">${c.descricao}</td>
+                    </tr>
+                `).join('');
+                document.getElementById('total-classificacoes').textContent = data.length;
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+
+        Promise.all([
+            fetch('/admin/api/pessoas').then(r => r.json()),
+            fetch('/admin/api/movimentos').then(r => r.json()),
+            fetch('/admin/api/classificacoes').then(r => r.json())
+        ]).then(([pessoas, movimentos, classificacoes]) => {
+            document.getElementById('total-pessoas').textContent = pessoas.length;
+            document.getElementById('total-movimentos').textContent = movimentos.length;
+            document.getElementById('total-classificacoes').textContent = classificacoes.length;
+        });
+    </script>
 </body>
 </html>

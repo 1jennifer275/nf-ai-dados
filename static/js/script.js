@@ -1,384 +1,358 @@
-// JavaScript Simples - Apenas JSON
-document.addEventListener('DOMContentLoaded', function() {
-    // Elementos DOM
-    const uploadArea = document.getElementById('uploadArea');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const fileInput = document.getElementById('fileInput');
-    const fileInfo = document.getElementById('fileInfo');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const uploadSection = document.getElementById('uploadSection');
-    const loadingSection = document.getElementById('loadingSection');
-    const resultsSection = document.getElementById('resultsSection');
-    const errorSection = document.getElementById('errorSection');
-    const jsonFrame = document.getElementById('jsonFrame');
-    const errorMessage = document.getElementById('errorMessage');
-    const saveToDatabaseBtn = document.getElementById('saveToDatabaseBtn');
-    const saveSection = document.getElementById('saveSection');
-    const saveStatus = document.getElementById('saveStatus');
+// Estado global
+let selectedFile = null;
+let currentData = null;
 
-    let selectedFile = null;
-    let currentData = null; // Armazenar dados atuais para salvamento
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+    setupDragAndDrop();
+    setupFileInput();
+    setupForm();
+});
 
-    // Event Listeners
-    // Upload button click
-    if (uploadBtn) {
-        uploadBtn.addEventListener('click', () => fileInput.click());
-    }
+// Configurar drag and drop
+function setupDragAndDrop() {
+    const dropArea = document.getElementById('drop-area');
+    const fileInput = document.getElementById('file-input');
     
-    // File input change
-    if (fileInput) {
-        fileInput.addEventListener('change', handleFileSelect);
-    }
+    if (!dropArea || !fileInput) return;
     
-    // Analyze button click
-    if (analyzeBtn) {
-        analyzeBtn.addEventListener('click', analyzeFile);
-    }
+    // Prevenir comportamento padrão do navegador
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
     
-    // Save to database button click
-    if (saveToDatabaseBtn) {
-        saveToDatabaseBtn.addEventListener('click', saveToDatabase);
-    }
+    // Highlight na área de drop
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => {
+            dropArea.classList.remove('border-gray-300');
+            dropArea.classList.add('border-black', 'bg-gray-50');
+        }, false);
+    });
     
-    // Drag and drop
-    if (uploadArea) {
-        uploadArea.addEventListener('dragover', handleDragOver);
-        uploadArea.addEventListener('drop', handleDrop);
-    }
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => {
+            dropArea.classList.remove('border-black', 'bg-gray-50');
+            dropArea.classList.add('border-gray-300');
+        }, false);
+    });
+    
+    // Handle drop
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    // Click para selecionar
+    dropArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+}
 
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file && file.type === 'application/pdf') {
-            selectedFile = file;
-            showFileInfo(file);
-            analyzeBtn.disabled = false;
-        } else {
-            showError('Por favor, selecione um arquivo PDF válido.');
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    
+    if (files.length > 0) {
+        const file = files[0];
+        handleFileSelection(file);
+    }
+}
+
+// Configurar input de arquivo
+function setupFileInput() {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput) return;
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFileSelection(e.target.files[0]);
         }
-    }
+    });
+}
 
-    function handleDragOver(event) {
-        event.preventDefault();
+// Lidar com seleção de arquivo
+function handleFileSelection(file) {
+    const fileNameDisplay = document.getElementById('file-name');
+    
+    if (!file) return;
+    
+    // Validar tipo de arquivo
+    if (file.type !== 'application/pdf') {
+        showAlert('Por favor, selecione apenas arquivos PDF', 'error');
+        return;
     }
+    
+    // Validar tamanho (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        showAlert('Arquivo muito grande. Máximo: 10MB', 'error');
+        return;
+    }
+    
+    selectedFile = file;
+    
+    // Mostrar nome do arquivo
+    if (fileNameDisplay) {
+        fileNameDisplay.textContent = `📄 ${file.name} (${formatFileSize(file.size)})`;
+        fileNameDisplay.classList.remove('hidden');
+    }
+}
 
-    function handleDrop(event) {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        if (files.length > 0) {
-            const file = files[0];
-            if (file.type === 'application/pdf') {
-                selectedFile = file;
-                fileInput.files = files;
-                showFileInfo(file);
-                analyzeBtn.disabled = false;
-            } else {
-                showError('Por favor, selecione um arquivo PDF válido.');
-            }
+// Configurar formulário
+function setupForm() {
+    const form = document.getElementById('upload-form');
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!selectedFile) {
+            showAlert('Por favor, selecione um arquivo PDF', 'error');
+            return;
         }
-    }
+        
+        await processarPDF();
+    });
+}
 
-    function showFileInfo(file) {
-        fileInfo.innerHTML = `<p>Arquivo selecionado: ${file.name}</p>`;
-        fileInfo.style.display = 'block';
-    }
-
-    function analyzeFile() {
-        if (!selectedFile) return;
-        
-        showSection('loading');
-        
-        const formData = new FormData();
-        formData.append('pdf', selectedFile);
-        
-        fetch('/upload', {
+// Processar PDF
+async function processarPDF() {
+    const uploadBtn = document.getElementById('upload-btn');
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    
+    // Mostrar loading
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Processando...';
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    
+    // Criar FormData
+    const formData = new FormData();
+    formData.append('pdf', selectedFile);  // Backend espera 'pdf'
+    
+    try {
+        const response = await fetch('/upload', {
             method: 'POST',
             body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                showError(data.error);
-            } else {
-                showResults(data);
-            }
-        })
-        .catch(error => {
-            showError('Erro ao processar arquivo: ' + error.message);
         });
-    }
-
-    function showResults(data) {
-        // Armazenar dados para possível salvamento
-        currentData = data;
         
-        // Separar dados de validação dos dados principais
-        const validacoes = data.validacoes;
-        const dadosParaExibir = {...data};
-        delete dadosParaExibir.validacoes; // Remove validações do JSON principal
-        delete dadosParaExibir.dados_originais; // Remove dados originais do JSON exibido
+        const data = await response.json();
         
-        // Exibir JSON filtrado
-        jsonFrame.innerHTML = `<pre>${JSON.stringify(dadosParaExibir, null, 2)}</pre>`;
-        
-        // Exibir mensagens de validação se existirem dados duplicados
-        if (validacoes) {
-            showValidationMessages(validacoes);
-        }
-        
-        // Mostrar botão de salvamento se não for nota fiscal duplicada
-        if (validacoes && !validacoes.nota_fiscal_existe) {
-            saveSection.style.display = 'block';
-            saveToDatabaseBtn.disabled = false;
-            saveStatus.innerHTML = '';
-            saveStatus.className = 'save-status';
-            
-            // Debug: verificar dados_novos
-            console.log('Dados novos recebidos:', validacoes.dados_novos);
-            
-            // Exibir dados novos que serão inseridos no banco
-            showNewDataPreview(validacoes.dados_novos);
+        if (data.error) {
+            showAlert('Erro ao processar: ' + data.error, 'error');
         } else {
-            saveSection.style.display = 'none';
-            // Ocultar frame de dados novos se não há salvamento
-            document.getElementById('newDataPreview').style.display = 'none';
+            currentData = data;
+            mostrarResultados(data);
         }
-        
-        showSection('results');
+    } catch (error) {
+        showAlert('Erro ao processar arquivo: ' + error.message, 'error');
+    } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Processar com IA';
+        loading.classList.add('hidden');
     }
+}
 
-    function showValidationMessages(validacoes) {
-        const validationMessages = document.getElementById('validationMessages');
-        const validationContent = document.getElementById('validationContent');
-        
-        if (!validacoes || (!validacoes.emitente_existe && !validacoes.remetente_existe && !validacoes.nota_fiscal_existe)) {
-            validationMessages.style.display = 'none';
-            return;
-        }
-        
-        let mensagens = [];
-        
-        if (validacoes.emitente_existe && validacoes.detalhes.emitente) {
-            const emitente = validacoes.detalhes.emitente;
-            mensagens.push(`<div class="validation-item">
-                <strong>Emitente:</strong> ${emitente.razao_social} (${emitente.documento}) já existe no banco de dados (ID: ${emitente.id})
-            </div>`);
-        }
-        
-        if (validacoes.remetente_existe && validacoes.detalhes.remetente) {
-            const remetente = validacoes.detalhes.remetente;
-            mensagens.push(`<div class="validation-item">
-                <strong>Remetente:</strong> ${remetente.razao_social} (${remetente.documento}) já existe no banco de dados (ID: ${remetente.id})
-            </div>`);
-        }
-        
-        if (validacoes.nota_fiscal_existe && validacoes.detalhes.nota_fiscal) {
-            const nf = validacoes.detalhes.nota_fiscal;
-            mensagens.push(`<div class="validation-item">
-                <strong>Nota Fiscal:</strong> Número ${nf.numero} de ${nf.data_emissao} no valor de R$ ${nf.valor_total.toFixed(2)} já existe no banco de dados (ID: ${nf.id})
-            </div>`);
-        }
-        
-        // Verificar classificações existentes
-        if (validacoes.classificacoes_existem && validacoes.classificacoes_existem.length > 0) {
-            validacoes.classificacoes_existem.forEach(classificacao => {
-                mensagens.push(`<div class="validation-item">
-                    <strong>Classificação:</strong> "${classificacao.nome}" já existe no banco de dados (ID: ${classificacao.id})
-                </div>`);
-            });
-        }
-        
-        // Verificar classificações criadas
-        if (validacoes.classificacoes_criadas && validacoes.classificacoes_criadas.length > 0) {
-            validacoes.classificacoes_criadas.forEach(classificacao => {
-                mensagens.push(`<div class="validation-item validation-success">
-                    <strong>Nova Classificação:</strong> "${classificacao.nome}" foi criada no banco de dados (ID: ${classificacao.id})
-                </div>`);
-            });
-        }
-        
-        if (mensagens.length > 0) {
-            validationContent.innerHTML = mensagens.join('');
-            validationMessages.style.display = 'block';
-        } else {
-            validationMessages.style.display = 'none';
-        }
+// Mostrar resultados
+function mostrarResultados(data) {
+    const results = document.getElementById('results');
+    const emitenteData = document.getElementById('emitente-data');
+    const notaData = document.getElementById('nota-data');
+    const itensData = document.getElementById('itens-data');
+    const classificacoesData = document.getElementById('classificacoes-data');
+    
+    // Emitente
+    if (data.emitente) {
+        emitenteData.innerHTML = `
+            ${criarCampoResultado('Razão Social', data.emitente.razao_social)}
+            ${criarCampoResultado('CNPJ', data.emitente.cnpj)}
+            ${data.emitente.inscricao_estadual ? criarCampoResultado('Inscrição Estadual', data.emitente.inscricao_estadual) : ''}
+            ${criarCampoResultado('Endereço', data.emitente.endereco)}
+            ${data.emitente.telefone ? criarCampoResultado('Telefone', data.emitente.telefone) : ''}
+        `;
     }
-
-    function showError(message) {
-        errorMessage.textContent = message;
-        showSection('error');
+    
+    // Nota Fiscal
+    if (data.nota_fiscal) {
+        const nf = data.nota_fiscal;
+        notaData.innerHTML = `
+            <div class="grid grid-cols-2 gap-4">
+                ${criarCampoResultado('Número', nf.numero)}
+                ${criarCampoResultado('Série', nf.serie || '-')}
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                ${criarCampoResultado('Data de Emissão', nf.data_emissao)}
+                ${criarCampoResultado('Valor Total', formatarMoeda(nf.valor_total))}
+            </div>
+        `;
     }
+    
+    // Destinatário/Remetente
+    const destinatarioSection = document.getElementById('destinatario-section');
+    const destinatarioData = document.getElementById('destinatario-data');
+    
+    if (data.remetente && destinatarioSection && destinatarioData) {
+        destinatarioData.innerHTML = `
+            ${criarCampoResultado('Nome/Razão Social', data.remetente.nome_completo)}
+            ${criarCampoResultado('CPF/CNPJ', data.remetente.cpf_ou_cnpj)}
+            ${criarCampoResultado('Endereço', data.remetente.endereco)}
+            ${data.remetente.cep ? criarCampoResultado('CEP', data.remetente.cep) : ''}
+            ${data.remetente.telefone ? criarCampoResultado('Telefone', data.remetente.telefone) : ''}
+        `;
+        destinatarioSection.classList.remove('hidden');
+    }
+    
+    // Itens
+    if (data.itens && data.itens.produtos) {
+        let itensHTML = '<div class="space-y-3">';
+        data.itens.produtos.forEach((produto, index) => {
+            itensHTML += `
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-bold text-gray-900">Item ${index + 1}</span>
+                        <span class="text-sm font-bold text-gray-900">${formatarMoeda(produto.valor_total)}</span>
+                    </div>
+                    <p class="text-sm text-gray-700">${produto.descricao}</p>
+                    <div class="mt-2 flex items-center space-x-4 text-xs text-gray-600">
+                        <span>Qtd: ${produto.quantidade}</span>
+                        <span>Unit: ${formatarMoeda(produto.valor_unitario)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        itensHTML += '</div>';
+        itensData.innerHTML = itensHTML;
+    }
+    
+    // Classificações
+    if (data.classificacoes && data.classificacoes.length > 0) {
+        let classifHTML = '<div class="flex flex-wrap gap-2">';
+        data.classificacoes.forEach(classif => {
+            classifHTML += `
+                <span class="px-3 py-1.5 bg-gray-100 text-gray-900 rounded-lg text-sm font-semibold border border-gray-200">
+                    ${classif}
+                </span>
+            `;
+        });
+        classifHTML += '</div>';
+        classificacoesData.innerHTML = classifHTML;
+    }
+    
+    // Mostrar seção de resultados
+    results.classList.remove('hidden');
+    
+    // Scroll suave para resultados
+    setTimeout(() => {
+        results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+}
 
-    function saveToDatabase() {
-        if (!currentData) {
-            showSaveStatus('Nenhum dado disponível para salvamento', 'error');
-            return;
-        }
+// Criar campo de resultado
+function criarCampoResultado(label, valor) {
+    return `
+        <div class="space-y-1">
+            <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">${label}</label>
+            <p class="text-sm font-semibold text-gray-900">${valor || '-'}</p>
+        </div>
+    `;
+}
 
-        // Desabilitar botão durante o salvamento
-        saveToDatabaseBtn.disabled = true;
-        saveToDatabaseBtn.textContent = 'Salvando...';
-        
-        // Limpar status anterior
-        saveStatus.innerHTML = '';
-        saveStatus.className = 'save-status';
+// Formatar moeda
+function formatarMoeda(valor) {
+    if (!valor) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    }).format(parseFloat(valor));
+}
 
-        fetch('/salvar-dados', {
+// Formatar tamanho do arquivo
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Salvar no banco de dados
+async function salvarNoBanco() {
+    if (!currentData) {
+        showAlert('Nenhum dado para salvar', 'error');
+        return;
+    }
+    
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Salvando...';
+    
+    try {
+        const response = await fetch('/salvar-dados', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(currentData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.sucesso) {
-                showSaveStatus(data.mensagem, 'success');
-                saveToDatabaseBtn.textContent = 'Dados Salvos!';
-            } else {
-                showSaveStatus(data.erro || 'Erro ao salvar dados', 'error');
-                saveToDatabaseBtn.disabled = false;
-                saveToDatabaseBtn.textContent = 'Enviar para o Banco';
-            }
-        })
-        .catch(error => {
-            showSaveStatus('Erro de conexão: ' + error.message, 'error');
-            saveToDatabaseBtn.disabled = false;
-            saveToDatabaseBtn.textContent = 'Enviar para o Banco';
         });
-    }
-
-    function showSaveStatus(message, type) {
-        saveStatus.innerHTML = message;
-        saveStatus.className = `save-status ${type}`;
-    }
-
-    function showSection(section) {
-        // Hide all sections
-        uploadSection.style.display = 'none';
-        loadingSection.style.display = 'none';
-        resultsSection.style.display = 'none';
-        errorSection.style.display = 'none';
         
-        // Show selected section
-        switch(section) {
-            case 'upload':
-                uploadSection.style.display = 'block';
-                break;
-            case 'loading':
-                loadingSection.style.display = 'block';
-                break;
-            case 'results':
-                resultsSection.style.display = 'block';
-                break;
-            case 'error':
-                errorSection.style.display = 'block';
-                break;
-        }
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function showNewDataPreview(dadosNovos) {
-        const newDataPreview = document.getElementById('newDataPreview');
-        const newDataFrame = document.getElementById('newDataFrame');
+        const result = await response.json();
         
-        console.log('showNewDataPreview chamada com:', dadosNovos);
-        
-        if (!dadosNovos || (!dadosNovos.emitente && !dadosNovos.remetente && !dadosNovos.nota_fiscal && (!dadosNovos.classificacoes_novas || dadosNovos.classificacoes_novas.length === 0))) {
-            console.log('Nenhum dado novo encontrado, ocultando frame');
-            newDataPreview.style.display = 'none';
-            return;
-        }
-        
-        let htmlContent = '';
-        
-        if (dadosNovos.emitente) {
-            console.log('Adicionando emitente:', dadosNovos.emitente);
-            htmlContent += `
-                <div class="new-data-section">
-                    <h4>Novo Emitente:</h4>
-                    <div class="data-item">
-                        <strong>Razão Social:</strong> ${dadosNovos.emitente.razao_social || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>CNPJ:</strong> ${dadosNovos.emitente.cnpj || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>Endereço:</strong> ${dadosNovos.emitente.endereco || 'N/A'}
-                    </div>
-                </div>
-            `;
-        }
-        
-        if (dadosNovos.remetente) {
-            console.log('Adicionando remetente:', dadosNovos.remetente);
-            htmlContent += `
-                <div class="new-data-section">
-                    <h4>Novo Remetente:</h4>
-                    <div class="data-item">
-                        <strong>Nome:</strong> ${dadosNovos.remetente.nome || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>CPF/CNPJ:</strong> ${dadosNovos.remetente.cpf_ou_cnpj || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>Endereço:</strong> ${dadosNovos.remetente.endereco || 'N/A'}
-                    </div>
-                </div>
-            `;
-        }
-        
-        if (dadosNovos.nota_fiscal) {
-            console.log('Adicionando nota fiscal:', dadosNovos.nota_fiscal);
-            htmlContent += `
-                <div class="new-data-section">
-                    <h4>Nova Nota Fiscal:</h4>
-                    <div class="data-item">
-                        <strong>Número:</strong> ${dadosNovos.nota_fiscal.numero || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>Data de Emissão:</strong> ${dadosNovos.nota_fiscal.data_emissao || 'N/A'}
-                    </div>
-                    <div class="data-item">
-                        <strong>Valor Total:</strong> R$ ${dadosNovos.nota_fiscal.valor_total ? parseFloat(dadosNovos.nota_fiscal.valor_total).toFixed(2) : '0,00'}
-                    </div>
-                    <div class="data-item">
-                        <strong>Descrição:</strong> ${dadosNovos.nota_fiscal.descricao || 'N/A'}
-                    </div>
-                </div>
-            `;
-        }
-        
-        if (dadosNovos.classificacoes_novas && dadosNovos.classificacoes_novas.length > 0) {
-            console.log('Adicionando classificações novas:', dadosNovos.classificacoes_novas);
-            htmlContent += `
-                <div class="new-data-section">
-                    <h4>Novas Classificações:</h4>
-            `;
-            dadosNovos.classificacoes_novas.forEach(classificacao => {
-                htmlContent += `
-                    <div class="data-item">
-                        <strong>Classificação:</strong> ${classificacao}
-                    </div>
-                `;
-            });
-            htmlContent += `</div>`;
-        }
-        
-        if (htmlContent) {
-            console.log('Exibindo frame com conteúdo:', htmlContent);
-            newDataFrame.innerHTML = htmlContent;
-            newDataPreview.style.display = 'block';
+        if (result.sucesso) {
+            showAlert('Dados salvos com sucesso no banco de dados!', 'success');
+            saveBtn.textContent = 'Salvo ✓';
+            
+            // Resetar após 3 segundos
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         } else {
-            console.log('Nenhum conteúdo para exibir, ocultando frame');
-            newDataPreview.style.display = 'none';
+            showAlert('Erro ao salvar: ' + (result.erro || 'Erro desconhecido'), 'error');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Salvar no Banco de Dados';
         }
+    } catch (error) {
+        showAlert('Erro ao salvar: ' + error.message, 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Salvar no Banco de Dados';
+    }
+}
+
+// Configurar botão de salvar
+document.addEventListener('DOMContentLoaded', () => {
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', salvarNoBanco);
     }
 });
+
+// Mostrar alerta
+function showAlert(mensagem, tipo) {
+    const alertSuccess = document.getElementById('alert-success');
+    const alertError = document.getElementById('alert-error');
+    const successMessage = document.getElementById('success-message');
+    const errorMessage = document.getElementById('error-message');
+    
+    if (tipo === 'success') {
+        successMessage.textContent = mensagem;
+        alertSuccess.classList.remove('hidden');
+        alertError.classList.add('hidden');
+        
+        setTimeout(() => {
+            alertSuccess.classList.add('hidden');
+        }, 5000);
+    } else {
+        errorMessage.textContent = mensagem;
+        alertError.classList.remove('hidden');
+        alertSuccess.classList.add('hidden');
+        
+        setTimeout(() => {
+            alertError.classList.add('hidden');
+        }, 5000);
+    }
+    
+    // Scroll para o topo
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
