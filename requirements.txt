@@ -1,8 +1,11 @@
 Flask==3.0.0
-Flask-CORS==4.0.0
-google-genai==0.1.0
+flask-cors==4.0.0
+google-genai==0.3.1
 PyPDF2==3.0.1
-psycopg[binary]==3.2.12
+psycopg[binary]==3.2.3
+psycopg2-binary==2.9.9
 SQLAlchemy==2.0.35
 Flask-SQLAlchemy==3.1.1
 python-dotenv==1.0.0
+requests==2.32.3
+gunicorn==21.2.0
